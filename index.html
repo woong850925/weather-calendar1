@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>날씨 &amp; 달력</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0A0C;
+    --card:#131316;
+    --card-2:#1B1B1F;
+    --line:#2B2B31;
+    --ink:#ECECEE;
+    --ink-soft:#93939C;
+    --accent:#5B9BD5;
+    --accent-2:#3D6E9E;
+    --sun:#FF6B6B;
+    --sat:#6FA8DC;
+    --kr-holiday:#E3A72B;
+    --us-holiday:#5FBE84;
+    --mono:'IBM Plex Mono', monospace;
+    --disp:'Space Grotesk', sans-serif;
+    --body:'Noto Sans KR', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);padding:20px;}
+  .wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:18px;}
+
+  .keybar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;
+  }
+  .keybar label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;white-space:nowrap;}
+  .keybar input{flex:1;min-width:220px;background:var(--card-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:var(--body);}
+  .keybar input:focus{outline:2px solid var(--accent-2);outline-offset:1px;}
+  .keybar .hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);}
+
+  .tabbar{display:flex;gap:6px;}
+  .tab-btn{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;
+    background:var(--card);border:1px solid var(--line);color:var(--ink-soft);
+    border-radius:10px 10px 0 0;padding:10px 18px;cursor:pointer;font-weight:600;
+    border-bottom:none;position:relative;top:1px;
+  }
+  .tab-btn.active{background:var(--card-2);color:var(--ink);border-color:var(--accent-2);}
+  .tab-panel{display:flex;flex-direction:column;gap:10px;background:var(--card-2);border:1px solid var(--accent-2);border-radius:0 12px 12px 12px;padding:14px;}
+  .tab-panel[hidden]{display:none;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .card-head{background:var(--card-2);color:var(--ink);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);}
+  .card-head h1,.card-head h2{font-family:var(--disp);font-size:20px;margin:0;font-weight:700;}
+  .clock{font-family:var(--mono);font-size:12px;color:var(--accent);}
+  .card-body{padding:18px 20px 22px;}
+
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;align-items:end;}
+  .field{display:flex;flex-direction:column;gap:5px;position:relative;}
+  .field label{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;}
+  .field input,.field select{border:1px solid var(--line);background:var(--card-2);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--body);color:var(--ink);}
+  .field input:focus,.field select:focus{outline:2px solid var(--accent-2);outline-offset:1px;}
+  .field select:disabled{opacity:.4;cursor:not-allowed;}
+  .fixed-city{border:1px solid var(--line);background:var(--card-2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);}
+
+  .refresh-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .btn{
+    font-family:var(--mono);font-size:12px;letter-spacing:.03em;
+    background:var(--accent);color:#08131F;border:none;border-radius:8px;
+    padding:9px 16px;cursor:pointer;font-weight:600;
+  }
+  .btn:hover{background:var(--accent-2);color:#fff;}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-soft);}
+  .btn.ghost:hover{color:var(--ink);border-color:var(--accent-2);}
+  .last-updated{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);}
+
+  .status-banner{font-family:var(--mono);font-size:11.5px;color:var(--accent);background:rgba(91,155,213,.08);border:1px dashed var(--accent-2);padding:8px 12px;border-radius:8px;margin-bottom:16px;}
+  .status-banner.err{color:#FF8A8A;border-color:#7A3A3A;background:rgba(255,107,107,.08);}
+
+  .now-row{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--line);}
+  .now-icon{font-size:44px;line-height:1;}
+  .now-temp{font-family:var(--disp);font-size:40px;font-weight:700;}
+  .now-meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);display:flex;gap:14px;flex-wrap:wrap;}
+  .now-meta b{color:var(--ink);font-weight:600;}
+
+  .section-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 10px;}
+
+  .hourly-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;margin-bottom:22px;}
+  .hour-card{flex:0 0 84px;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;}
+  .hour-card .t{font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+  .hour-card .ic{font-size:22px;margin:6px 0;}
+  .hour-card .temp{font-family:var(--disp);font-weight:700;font-size:15px;}
+  .hour-card .sub{font-family:var(--mono);font-size:9.5px;color:var(--ink-soft);margin-top:4px;line-height:1.5;}
+
+  .week-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .day-card{background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:10px 6px;text-align:center;}
+  .day-card .d{font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+  .day-card .ic{font-size:20px;margin:6px 0;}
+  .day-card .range{font-family:var(--disp);font-weight:600;font-size:13px;}
+  .day-card .sub{font-family:var(--mono);font-size:9px;color:var(--ink-soft);margin-top:4px;line-height:1.5;}
+
+  .cal-nav{display:flex;align-items:center;gap:10px;}
+  .cal-nav button{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;}
+  .cal-nav button:hover{background:var(--card);}
+
+  .mini-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+  .mini-cal{background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .mini-cal .mini-title{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-bottom:8px;text-align:center;}
+  .mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .mini-grid .mh{font-family:var(--mono);font-size:9px;color:var(--ink-soft);text-align:center;padding-bottom:2px;}
+  .mini-grid .md{font-family:var(--mono);font-size:10px;text-align:center;color:var(--ink);padding:2px 0;border-radius:4px;}
+  .mini-grid .md.out{color:#4A4A50;}
+  .mini-grid .md.sun{color:var(--sun);}
+  .mini-grid .md.sat{color:var(--sat);}
+
+  .grid-head{display:grid;grid-template-columns:36px repeat(7,1fr);font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:0 2px 8px;}
+  .grid-head span{text-align:center;}
+  .cal-grid{display:flex;flex-direction:column;gap:6px;}
+  .cal-week{display:grid;grid-template-columns:36px repeat(7,1fr);gap:6px;align-items:stretch;}
+  .wk-num{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink-soft);background:var(--card-2);border-radius:8px;}
+  .day-cell{min-height:66px;border:1px solid var(--line);border-radius:9px;padding:6px 7px;position:relative;background:var(--card-2);}
+  .day-cell.out{background:#0F0F12;}
+  .day-cell .num{font-family:var(--disp);font-weight:600;font-size:13.5px;color:var(--ink);}
+  .day-cell.sun .num{color:var(--sun);}
+  .day-cell.sat .num{color:var(--sat);}
+  .day-cell.out .num{color:#48484F;}
+  .day-cell.today{outline:2px solid var(--accent);outline-offset:-2px;}
+  .holi-tag{display:block;font-family:var(--mono);font-size:8.6px;line-height:1.3;margin-top:4px;padding:1px 4px;border-radius:4px;color:#0A0A0C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+  .holi-tag.kr{background:var(--kr-holiday);}
+  .holi-tag.us{background:var(--us-holiday);}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:3px;display:inline-block;}
+
+  @media (max-width:640px){
+    .day-cell{min-height:52px;padding:4px 5px;}
+    .holi-tag{font-size:7.6px;}
+    .now-temp{font-size:30px;}
+    .mini-row{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tabbar">
+    <button class="tab-btn active" id="tabDomesticBtn" type="button">국내</button>
+    <button class="tab-btn" id="tabIntlBtn" type="button">해외</button>
+  </div>
+
+  <div class="tab-panel" id="domesticPanel">
+    <div class="keybar">
+      <label for="kmaKey">기상청 인증키</label>
+      <input id="kmaKey" type="text" placeholder="공공데이터포털 서비스키를 입력하세요">
+      <button class="btn" id="kmaKeyCheckBtn" type="button">확인</button>
+      <span class="hint">※ 브라우저 직접 호출은 CORS로 제한되어, 미입력 시 실시간 대체 데이터(Open-Meteo)가 표시됩니다. &quot;확인&quot;을 누르면 하단 상태 표시줄에 적용 결과가 나타납니다.</span>
+    </div>
+    <div class="keybar">
+      <label for="vcKeyDom">Visual Crossing API키</label>
+      <input id="vcKeyDom" type="text" placeholder="Visual Crossing 계정 페이지의 API 키를 입력하세요" value="3R2SKJWM5L72NB3JNFR3XHGHN">
+      <button class="btn" id="vcKeyCheckBtnDom" type="button">확인</button>
+      <span class="hint">※ CORS를 지원해 브라우저에서 바로 호출됩니다. 국내 지역도 이 키가 있으면 Visual Crossing 실시간 데이터로 표시됩니다.</span>
+    </div>
+    <div class="controls">
+      <div class="field" id="sidoField">
+        <label>시/도</label>
+        <select id="sidoSelect"></select>
+      </div>
+      <div class="field" id="gugunField">
+        <label>구/군/시</label>
+        <select id="gugunSelect"></select>
+      </div>
+      <div class="field" id="dongField">
+        <label>동/읍/면</label>
+        <select id="dongSelect"></select>
+      </div>
+      <div class="field">
+        <label>서머타임(DST) 적용</label>
+        <select id="dstModeDom">
+          <option value="auto">자동 감지</option>
+          <option value="on">수동 적용</option>
+          <option value="off">미적용</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h1 id="cityTitleDom">서울</h1>
+        <div class="clock" id="clockNowDom">--:--</div>
+      </div>
+      <div class="card-body">
+
+        <div class="refresh-row">
+          <button class="btn" id="refreshBtnDom">🔄 새로고침 / 확인</button>
+          <span class="last-updated" id="lastUpdatedDom"></span>
+        </div>
+
+        <div class="status-banner" id="statusBannerDom">데이터 소스 확인 중...</div>
+
+        <div class="now-row" id="nowRowDom">
+          <div class="now-icon" id="nowIconDom">☁️</div>
+          <div>
+            <div class="now-temp" id="nowTempDom">--°</div>
+            <div class="hint" style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);" id="nowCondDom">불러오는 중</div>
+          </div>
+          <div class="now-meta">
+            <span>체감 <b id="nowFeelsDom">--°</b></span>
+            <span>습도 <b id="nowHumidityDom">--%</b></span>
+            <span>강수 <b id="nowPrecipDom">--mm</b></span>
+            <span>미세먼지(PM10) <b id="nowPm10Dom">-- ㎍/㎥</b></span>
+          </div>
+        </div>
+
+        <p class="section-label">1시간대별 예보 (24h)</p>
+        <div class="hourly-row" id="hourlyRowDom"></div>
+
+        <p class="section-label">1주일간 예보</p>
+        <div class="week-row" id="weekRowDom"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="intlPanel" hidden>
+    <div class="keybar">
+      <label for="vcKeyIntl">Visual Crossing API키</label>
+      <input id="vcKeyIntl" type="text" placeholder="Visual Crossing 계정 페이지의 API 키를 입력하세요" value="3R2SKJWM5L72NB3JNFR3XHGHN">
+      <button class="btn" id="vcKeyCheckBtnIntl" type="button">확인</button>
+      <span class="hint">※ CORS를 지원해 브라우저에서 바로 호출됩니다. 키 입력 시 Visual Crossing 실시간 데이터로 표시됩니다.</span>
+    </div>
+    <div class="controls">
+      <div class="field">
+        <label>지역</label>
+        <div class="fixed-city">시애틀</div>
+      </div>
+      <div class="field">
+        <label>서머타임(DST) 적용</label>
+        <select id="dstModeIntl">
+          <option value="auto">자동 감지</option>
+          <option value="on">수동 적용</option>
+          <option value="off">미적용</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h1 id="cityTitleIntl">시애틀</h1>
+        <div class="clock" id="clockNowIntl">--:--</div>
+      </div>
+      <div class="card-body">
+
+        <div class="refresh-row">
+          <button class="btn" id="refreshBtnIntl">🔄 새로고침 / 확인</button>
+          <span class="last-updated" id="lastUpdatedIntl"></span>
+        </div>
+
+        <div class="status-banner" id="statusBannerIntl">데이터 소스 확인 중...</div>
+
+        <div class="now-row" id="nowRowIntl">
+          <div class="now-icon" id="nowIconIntl">☁️</div>
+          <div>
+            <div class="now-temp" id="nowTempIntl">--°</div>
+            <div class="hint" style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);" id="nowCondIntl">불러오는 중</div>
+          </div>
+          <div class="now-meta">
+            <span>체감 <b id="nowFeelsIntl">--°</b></span>
+            <span>습도 <b id="nowHumidityIntl">--%</b></span>
+            <span>강수 <b id="nowPrecipIntl">--mm</b></span>
+            <span>미세먼지(PM10) <b id="nowPm10Intl">-- ㎍/㎥</b></span>
+          </div>
+        </div>
+
+        <p class="section-label">1시간대별 예보 (24h)</p>
+        <div class="hourly-row" id="hourlyRowIntl"></div>
+
+        <p class="section-label">1주일간 예보</p>
+        <div class="week-row" id="weekRowIntl"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2 id="calTitle">2026. 07</h2>
+      <div class="cal-nav">
+        <button id="prevMonth" aria-label="이전 달">‹</button>
+        <button id="nextMonth" aria-label="다음 달">›</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="mini-row">
+        <div class="mini-cal">
+          <div class="mini-title" id="miniPrevTitle">이전 달</div>
+          <div class="mini-grid" id="miniPrevGrid"></div>
+        </div>
+        <div class="mini-cal">
+          <div class="mini-title" id="miniNextTitle">다음 달</div>
+          <div class="mini-grid" id="miniNextGrid"></div>
+        </div>
+      </div>
+
+      <div class="grid-head">
+        <span></span><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--sun)"></span>일요일</span>
+        <span><span class="dot" style="background:var(--sat)"></span>토요일</span>
+        <span><span class="dot" style="background:var(--kr-holiday)"></span>국내 공휴일</span>
+        <span><span class="dot" style="background:var(--us-holiday)"></span>미국 공휴일</span>
+        <span><span class="dot" style="background:#0F0F12;border:1px solid var(--line)"></span>전달/다음달</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   0. 행정구역 데이터 (시/도 → 구/군/시)
+   서울/경기는 Open-Meteo 지오코딩으로 동/읍/면까지 상세 조회하고,
+   그 외 시/도는 구/군/시 단위까지만 선택합니다.
+========================================================= */
+const SIDO_GUGUN = {
+  "서울특별시": ["종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구","강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구","구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구"],
+  "부산광역시": ["중구","서구","동구","영도구","부산진구","동래구","남구","북구","해운대구","사하구","금정구","강서구","연제구","수영구","사상구","기장군"],
+  "대구광역시": ["중구","동구","서구","남구","북구","수성구","달서구","달성군"],
+  "인천광역시": ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
+  "광주광역시": ["동구","서구","남구","북구","광산구"],
+  "대전광역시": ["동구","중구","서구","유성구","대덕구"],
+  "울산광역시": ["중구","남구","동구","북구","울주군"],
+  "세종특별자치시": ["세종특별자치시"],
+  "경기도": ["수원시","성남시","의정부시","안양시","부천시","광명시","평택시","동두천시","안산시","고양시","과천시","구리시","남양주시","오산시","시흥시","군포시","의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시","광주시","양주시","포천시","여주시","연천군","가평군","양평군"],
+  "강원특별자치도": ["춘천시","원주시","강릉시","동해시","태백시","속초시","삼척시","홍천군","횡성군","영월군","평창군","정선군","철원군","화천군","양구군","인제군","고성군","양양군"],
+  "충청북도": ["청주시","충주시","제천시","보은군","옥천군","영동군","증평군","진천군","괴산군","음성군","단양군"],
+  "충청남도": ["천안시","공주시","보령시","아산시","서산시","논산시","계룡시","당진시","금산군","부여군","서천군","청양군","홍성군","예산군","태안군"],
+  "전북특별자치도": ["전주시","군산시","익산시","정읍시","남원시","김제시","완주군","진안군","무주군","장수군","임실군","순창군","고창군","부안군"],
+  "전라남도": ["목포시","여수시","순천시","나주시","광양시","담양군","곡성군","구례군","고흥군","보성군","화순군","장흥군","강진군","해남군","영암군","무안군","함평군","영광군","장성군","완도군","진도군","신안군"],
+  "경상북도": ["포항시","경주시","김천시","안동시","구미시","영주시","영천시","상주시","문경시","경산시","의성군","청송군","영양군","영덕군","청도군","고령군","성주군","칠곡군","예천군","봉화군","울진군","울릉군"],
+  "경상남도": ["창원시","진주시","통영시","사천시","김해시","밀양시","거제시","양산시","의령군","함안군","창녕군","고성군","남해군","하동군","산청군","함양군","거창군","합천군"],
+  "제주특별자치도": ["제주시","서귀포시"],
+};
+const DONG_DETAIL_SIDO = ["서울특별시","경기도"];
+
+// Open-Meteo 지오코딩만으로는 일부 구(특히 양천구)의 행정동이 누락되는 경우가 있어,
+// 실제 행정동 이름을 직접 지정해두고 좌표만 지오코딩으로 보완합니다.
+const DONG_NAME_OVERRIDES = {
+  "양천구": [
+    "목1동","목2동","목3동","목4동","목5동",
+    "신정1동","신정2동","신정3동","신정4동","신정6동","신정7동",
+    "신월1동","신월2동","신월3동","신월4동","신월5동","신월6동","신월7동"
+  ],
+  "남양주시": [
+    "와부읍","진접읍","화도읍","진건읍","오남읍","퇴계원읍",
+    "별내면","수동면","조안면",
+    "호평동","평내동","금곡동","양정동","다산1동","다산2동","별내동"
+  ]
+};
+
+let cityDom = {name:"서울", lat:37.5665, lon:126.9780, tz:"Asia/Seoul"};
+const SEATTLE = {name:"시애틀", lat:47.6062, lon:-122.3321, tz:"America/Los_Angeles"};
+
+function populateSido(){
+  const sel = document.getElementById("sidoSelect");
+  sel.innerHTML = Object.keys(SIDO_GUGUN).map(s=>`<option value="${s}">${s}</option>`).join("");
+  sel.value = "서울특별시";
+}
+function populateGugun(){
+  const sido = document.getElementById("sidoSelect").value;
+  const sel = document.getElementById("gugunSelect");
+  sel.innerHTML = SIDO_GUGUN[sido].map(g=>`<option value="${g}">${g}</option>`).join("");
+  sel.value = SIDO_GUGUN[sido].includes("양천구") ? "양천구" : SIDO_GUGUN[sido][0];
+}
+
+async function populateDong(){
+  const sido = document.getElementById("sidoSelect").value;
+  const gugun = document.getElementById("gugunSelect").value;
+  const dongField = document.getElementById("dongField");
+  const dongSel = document.getElementById("dongSelect");
+  const detailed = DONG_DETAIL_SIDO.includes(sido);
+
+  dongField.style.display = detailed ? "flex" : "none";
+
+  // 구/군 자체의 중심좌표부터 확보 (선택 즉시 날씨를 볼 수 있도록)
+  let centerCity = {name:gugun, lat:37.5665, lon:126.9780, tz:"Asia/Seoul"};
+
+  if(!detailed){
+    // 서울/경기가 아니면 구/군/시 중심좌표만 사용하고 동/읍/면 조회는 하지 않음
+    try{
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(gugun)}&count=20&language=ko&format=json&countryCode=KR`);
+      const data = await res.json();
+      const results = data.results || [];
+      const gugunHit = results.find(r => r.admin1 && r.admin1.includes(sido.replace(/특별시|광역시|특별자치시|특별자치도|도/g,"")) ) || results[0];
+      if(gugunHit){ centerCity = {name:gugun, lat:gugunHit.latitude, lon:gugunHit.longitude, tz:"Asia/Seoul"}; }
+    }catch(e){ console.warn("구/군 중심좌표 조회 실패", e); }
+    cityDom = centerCity;
+    return;
+  }
+
+  dongSel.disabled = true;
+  dongSel.innerHTML = `<option>불러오는 중...</option>`;
+  try{
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(gugun)}&count=20&language=ko&format=json&countryCode=KR`);
+    const data = await res.json();
+    const results = data.results || [];
+    const gugunHit = results.find(r => r.admin1 && r.admin1.includes(sido.replace(/특별시|광역시|특별자치시|특별자치도|도/g,"")) ) || results[0];
+    if(gugunHit){ centerCity = {name:gugun, lat:gugunHit.latitude, lon:gugunHit.longitude, tz:"Asia/Seoul"}; }
+
+    const overrideNames = DONG_NAME_OVERRIDES[gugun];
+    let options = `<option value="__center__">${gugun} 전체(중심)</option>`;
+
+    if(overrideNames){
+      // 실제 행정동 이름 목록을 그대로 쓰고, 좌표는 동 이름별로 개별 지오코딩해서 채운다.
+      const dongResults = await Promise.all(overrideNames.map(async dongName=>{
+        try{
+          const dRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(dongName)}&count=10&language=ko&format=json&countryCode=KR`);
+          const dData = await dRes.json();
+          const dResults = dData.results || [];
+          const hit = dResults.find(r => r.admin2 === gugun) || null;
+          return {name:dongName, lat: hit ? hit.latitude : centerCity.lat, lon: hit ? hit.longitude : centerCity.lon};
+        }catch(e){
+          return {name:dongName, lat:centerCity.lat, lon:centerCity.lon};
+        }
+      }));
+      dongResults.forEach(r=>{
+        options += `<option value="${r.lat},${r.lon}">${r.name}</option>`;
+      });
+    } else {
+      // 동/읍/면 후보: 같은 admin2(구/군)에 속하는 결과들을 모아본다.
+      const dongCandidates = results.filter(r => r.admin2 === gugun && r.name !== gugun);
+      dongCandidates.forEach(r=>{
+        options += `<option value="${r.latitude},${r.longitude}">${r.name}</option>`;
+      });
+    }
+    dongSel.innerHTML = options;
+  }catch(e){
+    dongSel.innerHTML = `<option value="__center__">${gugun} 전체(중심)</option>`;
+    console.warn("동 목록 조회 실패", e);
+  }
+  dongSel.disabled = false;
+  cityDom = centerCity;
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{});
+
+/* =========================================================
+   1. 공휴일 데이터
+========================================================= */
+const KR_HOLIDAYS = {
+  "2026-01-01":"신정","2026-02-16":"설날연휴","2026-02-17":"설날","2026-02-18":"설날연휴",
+  "2026-03-01":"삼일절","2026-03-02":"삼일절 대체공휴일","2026-05-05":"어린이날",
+  "2026-05-24":"부처님오신날","2026-05-25":"부처님오신날 대체공휴일","2026-06-06":"현충일",
+  "2026-08-15":"광복절","2026-08-17":"광복절 대체공휴일","2026-09-24":"추석연휴",
+  "2026-09-25":"추석","2026-09-26":"추석연휴","2026-10-03":"개천절","2026-10-05":"개천절 대체공휴일",
+  "2026-10-09":"한글날","2026-12-25":"크리스마스",
+};
+function nthWeekday(year, month, weekday, n){
+  const d = new Date(year, month, 1); let count = 0;
+  while(true){ if(d.getDay() === weekday){ count++; if(count === n) return new Date(d); } d.setDate(d.getDate()+1); }
+}
+function lastWeekday(year, month, weekday){
+  const d = new Date(year, month+1, 0);
+  while(d.getDay() !== weekday) d.setDate(d.getDate()-1);
+  return new Date(d);
+}
+function usHolidaysForYear(year){
+  const map = {};
+  const add = (date,label) => { map[fmtDate(date)] = label; };
+  add(new Date(year,0,1), "New Year's Day");
+  add(nthWeekday(year,0,1,3), "Martin Luther King Jr. Day");
+  add(nthWeekday(year,1,1,3), "Washington's Birthday");
+  add(lastWeekday(year,4,1), "Memorial Day");
+  add(new Date(year,5,19), "Juneteenth");
+  add(new Date(year,6,4), "Independence Day");
+  add(nthWeekday(year,8,1,1), "Labor Day");
+  add(nthWeekday(year,9,1,2), "Columbus Day");
+  add(new Date(year,10,11), "Veterans Day");
+  add(nthWeekday(year,10,4,4), "Thanksgiving");
+  add(new Date(year,11,25), "Christmas Day");
+  return map;
+}
+function fmtDate(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+/* =========================================================
+   2. 날씨 — Open-Meteo(무료·CORS 허용) 실시간 연동
+========================================================= */
+const WMO_ICON = (code)=>{
+  if(code===0) return "☀️"; if([1,2].includes(code)) return "🌤️"; if(code===3) return "☁️";
+  if([45,48].includes(code)) return "🌫️"; if([51,53,55,56,57].includes(code)) return "🌦️";
+  if([61,63,65,66,67,80,81,82].includes(code)) return "🌧️"; if([71,73,75,77,85,86].includes(code)) return "🌨️";
+  if([95,96,99].includes(code)) return "⛈️"; return "🌡️";
+};
+const WMO_TEXT = (code)=>{
+  if(code===0) return "맑음"; if([1,2].includes(code)) return "구름조금"; if(code===3) return "흐림";
+  if([45,48].includes(code)) return "안개"; if([51,53,55,56,57].includes(code)) return "이슬비";
+  if([61,63,65,66,67].includes(code)) return "비"; if([80,81,82].includes(code)) return "소나기";
+  if([71,73,75,77,85,86].includes(code)) return "눈"; if([95,96,99].includes(code)) return "뇌우"; return "-";
+};
+
+async function fetchOpenMeteo(city){
+  const params = new URLSearchParams({
+    latitude: city.lat, longitude: city.lon,
+    current: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code",
+    hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code",
+    daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
+    timezone: "auto", forecast_days: 8
+  });
+  const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+  const weather = await weatherRes.json();
+  return normalizeOpenMeteo(weather);
+}
+
+async function fetchPm10(city){
+  try{
+    const aq = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lon}&current=pm10&timezone=auto`);
+    const aqJson = await aq.json();
+    return aqJson.current ? aqJson.current.pm10 : null;
+  }catch(e){ console.warn("미세먼지 데이터 실패", e); return null; }
+}
+
+/* Visual Crossing Timeline API — CORS 허용, 국내/해외 공통으로 사용 가능 */
+async function fetchVisualCrossing(city, key){
+  const loc = `${city.lat},${city.lon}`;
+  const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(loc)}?unitGroup=metric&lang=ko&include=current,hours,days&key=${encodeURIComponent(key)}&contentType=json`;
+  const res = await fetch(url);
+  if(!res.ok){
+    const msg = await res.text().catch(()=> "");
+    throw new Error(`Visual Crossing 오류 (${res.status}) ${msg}`.trim());
+  }
+  const data = await res.json();
+  return normalizeVisualCrossing(data);
+}
+
+const VC_ICON = (icon)=>({
+  "clear-day":"☀️","clear-night":"🌙","partly-cloudy-day":"🌤️","partly-cloudy-night":"☁️",
+  "cloudy":"☁️","fog":"🌫️","wind":"🌬️","rain":"🌧️","showers-day":"🌦️","showers-night":"🌦️",
+  "snow":"🌨️","sleet":"🌨️","thunder-rain":"⛈️","thunder-showers-day":"⛈️","thunder-showers-night":"⛈️","thunder":"⛈️"
+}[icon] || "🌡️");
+const VC_TEXT_FALLBACK = (icon)=>({
+  "clear-day":"맑음","clear-night":"맑음","partly-cloudy-day":"구름조금","partly-cloudy-night":"구름조금",
+  "cloudy":"흐림","fog":"안개","wind":"바람","rain":"비","showers-day":"소나기","showers-night":"소나기",
+  "snow":"눈","sleet":"진눈깨비","thunder-rain":"뇌우","thunder-showers-day":"뇌우","thunder-showers-night":"뇌우","thunder":"뇌우"
+}[icon] || "-");
+
+/* 두 소스를 동일한 형태로 통일: {current, hourly:[], daily:[]} */
+function normalizeOpenMeteo(weather){
+  const cur = weather.current, hourly = weather.hourly, daily = weather.daily;
+  const nowIdx = hourly.time.findIndex(t => new Date(t) >= new Date(new Date().setMinutes(0,0,0)));
+  const startIdx = nowIdx === -1 ? 0 : nowIdx;
+  const hourlyList = [];
+  for(let i=startIdx; i<startIdx+24 && i<hourly.time.length; i++){
+    hourlyList.push({
+      time: new Date(hourly.time[i]),
+      icon: WMO_ICON(hourly.weather_code[i]),
+      temp: hourly.temperature_2m[i],
+      feels: hourly.apparent_temperature[i],
+      humidity: hourly.relative_humidity_2m[i],
+      precip: hourly.precipitation[i]
+    });
+  }
+  const dailyList = [];
+  for(let i=0; i<7 && i<daily.time.length; i++){
+    dailyList.push({
+      date: new Date(daily.time[i]),
+      icon: WMO_ICON(daily.weather_code[i]),
+      tempMin: daily.temperature_2m_min[i],
+      tempMax: daily.temperature_2m_max[i],
+      precip: daily.precipitation_sum[i]
+    });
+  }
+  return {
+    current: {
+      icon: WMO_ICON(cur.weather_code), condText: WMO_TEXT(cur.weather_code),
+      temp: cur.temperature_2m, feels: cur.apparent_temperature,
+      humidity: cur.relative_humidity_2m, precip: cur.precipitation
+    },
+    hourly: hourlyList, daily: dailyList
+  };
+}
+
+function normalizeVisualCrossing(data){
+  const cur = data.currentConditions;
+  const flatHours = [];
+  (data.days || []).forEach(day=>{
+    (day.hours || []).forEach(h=>{
+      flatHours.push({ time: new Date(`${day.datetime}T${h.datetime}`), h });
+    });
+  });
+  const now = new Date();
+  let startIdx = flatHours.findIndex(x => x.time >= new Date(now.setMinutes(0,0,0)));
+  if(startIdx === -1) startIdx = 0;
+  const hourlyList = flatHours.slice(startIdx, startIdx+24).map(x=>({
+    time: x.time, icon: VC_ICON(x.h.icon),
+    temp: x.h.temp, feels: x.h.feelslike, humidity: x.h.humidity, precip: x.h.precip
+  }));
+  const dailyList = (data.days || []).slice(0,7).map(day=>({
+    date: new Date(day.datetime), icon: VC_ICON(day.icon),
+    tempMin: day.tempmin, tempMax: day.tempmax, precip: day.precip
+  }));
+  return {
+    current: {
+      icon: VC_ICON(cur.icon), condText: VC_TEXT_FALLBACK(cur.icon),
+      temp: cur.temp, feels: cur.feelslike, humidity: cur.humidity, precip: cur.precip
+    },
+    hourly: hourlyList, daily: dailyList
+  };
+}
+
+/* =========================================================
+   3. 렌더링
+========================================================= */
+// 국내/해외 탭에 각각 있는 Visual Crossing 키 입력을 서로 동기화한다.
+function syncPairedInputs(idA, idB){
+  const a = document.getElementById(idA), b = document.getElementById(idB);
+  a.addEventListener("input", ()=>{ b.value = a.value; });
+  b.addEventListener("input", ()=>{ a.value = b.value; });
+}
+
+function setMode(mode){
+  const domOn = mode === "domestic";
+  document.getElementById("tabDomesticBtn").classList.toggle("active", domOn);
+  document.getElementById("tabIntlBtn").classList.toggle("active", !domOn);
+  document.getElementById("domesticPanel").hidden = !domOn;
+  document.getElementById("intlPanel").hidden = domOn;
+  // 탭 전환은 화면 표시만 바꿀 뿐, 두 탭의 날씨 데이터는 각자 독립적으로 유지된다.
+}
+
+function getDstOffsetLabel(city, suffix){
+  const mode = document.getElementById("dstMode"+suffix).value;
+  try{
+    const now = new Date();
+    const jan = new Date(now.getFullYear(),0,1);
+    const jul = new Date(now.getFullYear(),6,1);
+    const fmt = (d)=> new Intl.DateTimeFormat("en-US",{timeZone:city.tz,timeZoneName:"shortOffset"}).format(d).split(" ").pop();
+    const janOff = fmt(jan), julOff = fmt(jul), nowOff = fmt(now);
+    if(mode === "off") return `${janOff} (DST 미적용 표시)`;
+    if(mode === "on") return `${nowOff} (DST 수동적용)`;
+    return `${nowOff}${janOff!==julOff && nowOff===julOff ? " · 서머타임 적용중" : ""}`;
+  }catch(e){ return ""; }
+}
+
+function checkKmaKey(){
+  const banner = document.getElementById("statusBannerDom");
+  const key = document.getElementById("kmaKey").value.trim();
+  if(!key){
+    banner.className = "status-banner err";
+    banner.textContent = "⚠️ 기상청 인증키가 비어 있습니다.";
+    return;
+  }
+  // 기상청 단기예보 API는 브라우저에서 직접 호출 시 CORS로 차단되어 실제 검증은
+  // 서버(프록시)가 있어야 가능합니다. 여기서는 키가 입력되었음을 확인하고
+  // 그 상태를 하단 배너에 즉시 반영합니다.
+  banner.className = "status-banner";
+  banner.textContent = "ℹ️ 키가 입력되었습니다. 다만 브라우저에서 기상청 API를 직접 호출하면 CORS로 막히기 때문에(서버 프록시 필요), 실제 검증은 불가합니다.";
+  loadWeather("Dom");
+}
+
+async function checkVcKey(suffix){
+  const banner = document.getElementById("statusBanner"+suffix);
+  const city = suffix === "Dom" ? cityDom : SEATTLE;
+  const key = document.getElementById("vcKey"+suffix).value.trim();
+  if(!key){
+    banner.className = "status-banner err";
+    banner.textContent = "⚠️ Visual Crossing API 키가 비어 있습니다.";
+    return;
+  }
+  banner.className = "status-banner";
+  banner.textContent = "Visual Crossing 키를 확인하는 중...";
+  try{
+    await fetchVisualCrossing(city, key);
+    banner.textContent = "✅ Visual Crossing 키가 정상적으로 확인되었습니다.";
+    loadWeather(suffix);
+  }catch(e){
+    banner.className = "status-banner err";
+    banner.textContent = "⚠️ Visual Crossing 키 확인 실패: " + e.message;
+    console.error(e);
+  }
+}
+
+// suffix: "Dom"(국내 탭) 또는 "Intl"(해외 탭) — 각 탭은 자기 카드 DOM만 건드리고,
+// 서로의 데이터/상태에 전혀 영향을 주지 않는다.
+async function loadWeather(suffix){
+  const banner = document.getElementById("statusBanner"+suffix);
+  const city = suffix === "Dom" ? cityDom : SEATTLE;
+  document.getElementById("cityTitle"+suffix).textContent = city.name;
+
+  banner.className = "status-banner";
+  banner.textContent = "데이터를 불러오는 중...";
+
+  const tzLabel = getDstOffsetLabel(city, suffix);
+  document.getElementById("clockNow"+suffix).textContent =
+    new Intl.DateTimeFormat("ko-KR",{timeZone:city.tz,hour:"2-digit",minute:"2-digit"}).format(new Date()) +
+    (tzLabel ? `  ·  UTC${tzLabel}` : "");
+
+  const vcKey = document.getElementById("vcKey"+suffix).value.trim();
+
+  try{
+    const pm10 = await fetchPm10(city); // 미세먼지는 소스와 무관하게 항상 Open-Meteo 대기질 API 사용
+    let normalized;
+    if(vcKey){
+      normalized = await fetchVisualCrossing(city, vcKey);
+      banner.textContent = "✅ Visual Crossing 실시간 데이터 표시 중";
+    } else {
+      normalized = await fetchOpenMeteo(city);
+      banner.textContent = "✅ Open-Meteo 실시간 데이터 표시 중";
+    }
+    renderWeather(normalized, pm10, suffix);
+    document.getElementById("lastUpdated"+suffix).textContent = "마지막 갱신 " + new Intl.DateTimeFormat("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date());
+  }catch(e){
+    banner.className = "status-banner err";
+    banner.textContent = "⚠️ 날씨 데이터를 불러오지 못했습니다: " + e.message;
+    console.error(e);
+  }
+}
+
+function renderWeather(normalized, pm10, suffix){
+  const cur = normalized.current;
+  document.getElementById("nowIcon"+suffix).textContent = cur.icon;
+  document.getElementById("nowTemp"+suffix).textContent = Math.round(cur.temp) + "°";
+  document.getElementById("nowCond"+suffix).textContent = cur.condText;
+  document.getElementById("nowFeels"+suffix).textContent = Math.round(cur.feels) + "°";
+  document.getElementById("nowHumidity"+suffix).textContent = Math.round(cur.humidity) + "%";
+  document.getElementById("nowPrecip"+suffix).textContent = cur.precip + "mm";
+  document.getElementById("nowPm10"+suffix).textContent = pm10!=null ? Math.round(pm10) + " ㎍/㎥" : "정보없음";
+
+  const hourlyRow = document.getElementById("hourlyRow"+suffix);
+  hourlyRow.innerHTML = "";
+  normalized.hourly.forEach(h=>{
+    hourlyRow.innerHTML += `
+      <div class="hour-card">
+        <div class="t">${String(h.time.getHours()).padStart(2,"0")}시</div>
+        <div class="ic">${h.icon}</div>
+        <div class="temp">${Math.round(h.temp)}°</div>
+        <div class="sub">체감 ${Math.round(h.feels)}°<br>습도 ${Math.round(h.humidity)}%<br>강수 ${h.precip}mm</div>
+      </div>`;
+  });
+
+  const weekRow = document.getElementById("weekRow"+suffix);
+  weekRow.innerHTML = "";
+  const wdays = ["일","월","화","수","목","금","토"];
+  normalized.daily.forEach((d,i)=>{
+    weekRow.innerHTML += `
+      <div class="day-card">
+        <div class="d">${i===0?"오늘":wdays[d.date.getDay()]}</div>
+        <div class="ic">${d.icon}</div>
+        <div class="range">${Math.round(d.tempMin)}° / ${Math.round(d.tempMax)}°</div>
+        <div class="sub">강수 ${d.precip}mm</div>
+      </div>`;
+  });
+}
+
+/* =========================================================
+   4. 달력
+========================================================= */
+let calYear, calMonth;
+function isoWeekNumber(date){
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+}
+function buildMonthCells(year, month){
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const cells = [];
+  for(let i=0;i<startOffset;i++){
+    const dayNum = daysInPrevMonth - startOffset + 1 + i;
+    const m = month===0 ? 11 : month-1;
+    const y = month===0 ? year-1 : year;
+    cells.push({date:new Date(y,m,dayNum), out:true});
+  }
+  for(let d=1; d<=daysInMonth; d++){ cells.push({date:new Date(year,month,d), out:false}); }
+  let nextDay = 1;
+  while(cells.length % 7 !== 0){
+    const m = month===11 ? 0 : month+1;
+    const y = month===11 ? year+1 : year;
+    cells.push({date:new Date(y,m,nextDay), out:true});
+    nextDay++;
+  }
+  return cells;
+}
+function renderMiniCalendar(year, month, titleId, gridId){
+  document.getElementById(titleId).textContent = `${year}. ${String(month+1).padStart(2,"0")}`;
+  const cells = buildMonthCells(year, month);
+  const grid = document.getElementById(gridId);
+  const heads = ["일","월","화","수","목","금","토"];
+  let html = heads.map(h=>`<div class="mh">${h}</div>`).join("");
+  cells.forEach((cell,i)=>{
+    const dow = i % 7;
+    let cls = "md";
+    if(cell.out) cls += " out"; else if(dow===0) cls += " sun"; else if(dow===6) cls += " sat";
+    html += `<div class="${cls}">${cell.date.getDate()}</div>`;
+  });
+  grid.innerHTML = html;
+}
+function renderCalendar(){
+  document.getElementById("calTitle").textContent = `${calYear}. ${String(calMonth+1).padStart(2,"0")}`;
+  const prevM = calMonth===0 ? 11 : calMonth-1;
+  const prevY = calMonth===0 ? calYear-1 : calYear;
+  const nextM = calMonth===11 ? 0 : calMonth+1;
+  const nextY = calMonth===11 ? calYear+1 : calYear;
+  renderMiniCalendar(prevY, prevM, "miniPrevTitle", "miniPrevGrid");
+  renderMiniCalendar(nextY, nextM, "miniNextTitle", "miniNextGrid");
+
+  const usHolidays = {...usHolidaysForYear(calYear-1), ...usHolidaysForYear(calYear), ...usHolidaysForYear(calYear+1)};
+  const cells = buildMonthCells(calYear, calMonth);
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+  const todayStr = fmtDate(new Date());
+
+  for(let w=0; w<cells.length/7; w++){
+    const weekCells = cells.slice(w*7,(w*7)+7);
+    const weekEl = document.createElement("div");
+    weekEl.className = "cal-week";
+    const wkNum = document.createElement("div");
+    wkNum.className = "wk-num";
+    wkNum.textContent = String(isoWeekNumber(weekCells[3].date)).padStart(2,"0");
+    weekEl.appendChild(wkNum);
+
+    weekCells.forEach((cell, idx)=>{
+      const dateStr = fmtDate(cell.date);
+      const dow = idx;
+      const div = document.createElement("div");
+      let cls = "day-cell";
+      if(cell.out) cls += " out"; else if(dow===0) cls += " sun"; else if(dow===6) cls += " sat";
+      if(dateStr === todayStr) cls += " today";
+      div.className = cls;
+      let tags = "";
+      if(KR_HOLIDAYS[dateStr]) tags += `<span class="holi-tag kr" title="${KR_HOLIDAYS[dateStr]}">${KR_HOLIDAYS[dateStr]}</span>`;
+      if(usHolidays[dateStr]) tags += `<span class="holi-tag us" title="${usHolidays[dateStr]}">${usHolidays[dateStr]}</span>`;
+      div.innerHTML = `<div class="num">${cell.date.getDate()}</div>${tags}`;
+      weekEl.appendChild(div);
+    });
+    grid.appendChild(weekEl);
+  }
+}
+
+/* =========================================================
+   5. 초기화 & 이벤트
+========================================================= */
+async function init(){
+  const today = new Date();
+  calYear = today.getFullYear();
+  calMonth = today.getMonth();
+
+  populateSido();
+  populateGugun();
+  await populateDong();
+  setMode("domestic");
+  loadWeather("Dom");
+  loadWeather("Intl");
+  renderCalendar();
+
+  document.getElementById("tabDomesticBtn").addEventListener("click", ()=> setMode("domestic"));
+  document.getElementById("tabIntlBtn").addEventListener("click", ()=> setMode("intl"));
+
+  document.getElementById("sidoSelect").addEventListener("change", async ()=>{ populateGugun(); await populateDong(); loadWeather("Dom"); });
+  document.getElementById("gugunSelect").addEventListener("change", async ()=>{ await populateDong(); loadWeather("Dom"); });
+  document.getElementById("dongSelect").addEventListener("change", ()=>{
+    const val = document.getElementById("dongSelect").value;
+    if(val !== "__center__"){
+      const [lat,lon] = val.split(",").map(Number);
+      const label = document.getElementById("dongSelect").selectedOptions[0].textContent;
+      cityDom = {name:label, lat, lon, tz:"Asia/Seoul"};
+    } else {
+      cityDom.name = document.getElementById("gugunSelect").value;
+    }
+    loadWeather("Dom");
+  });
+
+  syncPairedInputs("vcKeyDom","vcKeyIntl");
+  syncPairedInputs("dstModeDom","dstModeIntl");
+
+  document.getElementById("dstModeDom").addEventListener("change", ()=> loadWeather("Dom"));
+  document.getElementById("dstModeIntl").addEventListener("change", ()=> loadWeather("Intl"));
+  document.getElementById("refreshBtnDom").addEventListener("click", ()=> loadWeather("Dom"));
+  document.getElementById("refreshBtnIntl").addEventListener("click", ()=> loadWeather("Intl"));
+  document.getElementById("kmaKeyCheckBtn").addEventListener("click", checkKmaKey);
+  document.getElementById("vcKeyCheckBtnDom").addEventListener("click", ()=> checkVcKey("Dom"));
+  document.getElementById("vcKeyCheckBtnIntl").addEventListener("click", ()=> checkVcKey("Intl"));
+
+  document.getElementById("prevMonth").addEventListener("click", ()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
+  document.getElementById("nextMonth").addEventListener("click", ()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
+}
+init();
+</script>
+</body>
+</html>
